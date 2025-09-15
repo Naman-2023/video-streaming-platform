@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  video-platform:
+    build: .
+    ports:
+      - "3001:3001"  # Upload Service
+      - "3004:3004"  # Streaming Service  
+      - "3005:3005"  # Transcoding Service
+    volumes:
+      - ./transcoded:/app/transcoded
+      - ./test-videos:/app/test-videos
+    environment:
+      - NODE_ENV=production
+      - REDIS_URL=redis://localhost:6379
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+
+  # Optional: Separate Redis container (if you prefer external Redis)
+  # redis:
+  #   image: redis:7-alpine
+  #   ports:
+  #     - "6379:6379"
+  #   volumes:
+  #     - redis-data:/data
+  #   restart: unless-stopped
+
+# volumes:
+#   redis-data:
