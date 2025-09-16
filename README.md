@@ -132,7 +132,7 @@ http://localhost:3004/api/v1/stream/job_1758010126855_6lecfzv3a/1080p/playlist.m
 3. Paste the master playlist URL
 4. Click Play
 
-## Architecture
+## Architecture - Event-Driven Microservices
 
 ```
                     ┌─────────────────┐
@@ -145,22 +145,35 @@ http://localhost:3004/api/v1/stream/job_1758010126855_6lecfzv3a/1080p/playlist.m
         ▼                    ▼                    ▼
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
 │  Upload Service │    │ Transcoding      │    │ Streaming       │
-│  Port: 3001     │───▶│ Service          │───▶│ Service         │
+│  Port: 3001     │    │ Service          │    │ Service         │
 │                 │    │ Port: 3005       │    │ Port: 3004      │
 └─────────────────┘    └──────────────────┘    └─────────────────┘
          │                       │                       │
-         │              ┌─────────────────┐              │
-         └─────────────▶│     Redis       │◀─────────────┘
-                        │   Port: 6379    │
-                        └─────────────────┘
+         │                       │                       │
+         ▼                       ▼                       ▼
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│     Kafka       │    │     Redis       │    │   File System   │
+│   Port: 9092    │    │   Port: 6379    │    │   (transcoded)  │
+│ Job Queue       │    │ Status & Cache  │    │                 │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+
+Event Flow: Upload → Kafka Topic → Worker → Streaming Ready
 ```
 
 ### Services
 
 - **API Gateway**: Single entry point with routing, rate limiting, and health checks
-- **Upload Service**: Handles file uploads and triggers transcoding
-- **Transcoding Service**: Converts videos to multiple qualities using FFmpeg
+- **Upload Service**: Handles file uploads and publishes jobs to Kafka
+- **Transcoding Service**: Consumes Kafka jobs and converts videos using FFmpeg
 - **Streaming Service**: Serves HLS playlists and video segments
+
+### Infrastructure
+
+- **Kafka**: Event streaming platform for job queue management
+  - `video.transcoding.jobs` - Main job queue
+  - `video.streaming.ready` - Completion notifications
+- **Redis**: Real-time status updates and API rate limiting
+- **Zookeeper**: Kafka coordination service
 
 ## File Structure
 

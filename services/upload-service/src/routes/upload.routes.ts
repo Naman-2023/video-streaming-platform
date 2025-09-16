@@ -2,8 +2,8 @@ import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs-extra';
-import axios from 'axios';
 import { createClient } from 'redis';
+import { createProducer, TOPICS } from '../kafka';
 
 // Configure multer for file uploads
 const upload = multer({
@@ -85,34 +85,44 @@ router.post('/file', upload.single('video'), async (req: Request, res: Response)
       path: req.file.path
     });
 
-    // Trigger transcoding automatically via transcoding service
+    // Queue transcoding job via Kafka
     try {
+      const producer = createProducer();
+      await producer.connect();
+      
       const absoluteInputPath = path.resolve(req.file.path);
       const absoluteOutputPath = path.resolve('../../transcoded', jobId);
       
-      console.log('Starting automatic transcoding:', {
+      console.log('Queuing transcoding job to Kafka:', {
         jobId,
         inputPath: absoluteInputPath,
         outputPath: absoluteOutputPath
       });
 
-      // Call transcoding service API
-      const transcodingResponse = await axios.post('http://localhost:3005/api/v1/transcode', {
-        jobId,
-        inputPath: absoluteInputPath,
-        outputPath: absoluteOutputPath
+      // Send job to Kafka topic
+      await producer.send({
+        topic: TOPICS.TRANSCODING_JOBS,
+        messages: [{
+          key: jobId,
+          value: JSON.stringify({
+            jobId,
+            inputPath: absoluteInputPath,
+            outputPath: absoluteOutputPath,
+            userId,
+            originalFilename: req.file.originalname,
+            createdAt: new Date().toISOString()
+          })
+        }]
       });
       
-      console.log('Transcoding job queued:', { 
-        jobId, 
-        response: transcodingResponse.data
-      });
+      await producer.disconnect();
+      console.log('Transcoding job queued to Kafka:', { jobId });
     } catch (error) {
-      console.error('Failed to start transcoding:', {
+      console.error('Failed to queue transcoding job:', {
         jobId,
         error: error instanceof Error ? error.message : 'Unknown error'
       });
-      // Don't fail the upload if transcoding fails to start
+      // Don't fail the upload if Kafka fails
     }
 
     res.status(201).json({

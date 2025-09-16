@@ -2,6 +2,7 @@ import { createClient } from 'redis';
 import { spawn } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
+import { createConsumer, createProducer, TOPICS, CONSUMER_GROUP } from './kafka';
 
 let redisClient: any;
 
@@ -232,62 +233,68 @@ async function transcodeVideo(jobId: string, inputPath: string, outputPath: stri
   }
 }
 
-async function processQueue() {
-  if (!redisClient) {
-    console.warn('⚠️  Redis client not available, skipping queue check');
-    return;
-  }
-
+async function startKafkaConsumer() {
+  const consumer = createConsumer();
+  const producer = createProducer();
+  
   try {
-    // Get job from queue with timeout
-    const jobData = await redisClient.brPop('transcoding:queue', 5);
+    await consumer.connect();
+    await producer.connect();
     
-    if (jobData) {
-      const job = JSON.parse(jobData.element);
-      console.log(`📥 Processing job from queue:`, {
-        jobId: job.jobId,
-        inputPath: job.inputPath,
-        outputPath: job.outputPath
-      });
-      
-      await transcodeVideo(job.jobId, job.inputPath, job.outputPath);
-    }
+    await consumer.subscribe({ topic: TOPICS.TRANSCODING_JOBS });
+    
+    console.log(`🎯 Kafka consumer connected, listening to ${TOPICS.TRANSCODING_JOBS}`);
+    
+    await consumer.run({
+      eachMessage: async ({ message }: { message: any }) => {
+        try {
+          const job = JSON.parse(message.value!.toString());
+          console.log(`📥 Processing job from Kafka:`, {
+            jobId: job.jobId,
+            inputPath: job.inputPath,
+            outputPath: job.outputPath
+          });
+          
+          await transcodeVideo(job.jobId, job.inputPath, job.outputPath);
+          
+          // Notify that video is ready for streaming
+          await producer.send({
+            topic: TOPICS.STREAMING_READY,
+            messages: [{
+              key: job.jobId,
+              value: JSON.stringify({
+                jobId: job.jobId,
+                status: 'ready',
+                completedAt: new Date().toISOString()
+              })
+            }]
+          });
+          
+          console.log(`✅ Job completed and streaming notification sent: ${job.jobId}`);
+        } catch (error) {
+          console.error('💥 Error processing Kafka message:', error);
+        }
+      }
+    });
   } catch (error) {
-    console.error('💥 Error processing queue:', error);
-    
-    // Wait a bit before retrying on error
-    await new Promise(resolve => setTimeout(resolve, 5000));
+    console.error('💥 Kafka consumer error:', error);
+    // Retry connection after delay
+    setTimeout(startKafkaConsumer, 5000);
   }
 }
 
 let isShuttingDown = false;
 
 async function startWorker() {
-  console.log('🔧 Starting Transcoding Worker...');
+  console.log('🔧 Starting Transcoding Worker with Kafka...');
   console.log(`🆔 Worker PID: ${process.pid}`);
   
-  await initRedis();
+  await initRedis(); // Still need Redis for status updates
   
-  // Process queue continuously
-  while (!isShuttingDown) {
-    try {
-      await processQueue();
-      
-      // Short wait between queue checks
-      if (!isShuttingDown) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-    } catch (error) {
-      console.error('💥 Worker loop error:', error);
-      
-      // Wait longer on error to prevent spam
-      if (!isShuttingDown) {
-        await new Promise(resolve => setTimeout(resolve, 5000));
-      }
-    }
-  }
+  // Start Kafka consumer (runs indefinitely)
+  await startKafkaConsumer();
   
-  console.log('🔌 Worker loop ended');
+  console.log('🔌 Worker ended');
 }
 
 // Graceful shutdown handling

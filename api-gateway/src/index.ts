@@ -83,8 +83,7 @@ app.get('/', (req, res) => {
       'GET /api/stream/:jobId/master.m3u8': 'Get master playlist',
       'GET /api/stream/:jobId/:quality/playlist.m3u8': 'Get quality playlist',
       'GET /api/stream/:jobId/:quality/:segment': 'Get video segment',
-      'POST /api/transcode': 'Start transcoding job',
-      'GET /api/transcode/status/:jobId': 'Get transcoding status'
+      'GET /api/transcode/status/:jobId': 'Get transcoding status (via transcoding service)'
     },
     services: SERVICES
   });
@@ -139,7 +138,7 @@ const transcodingProxy = createProxyMiddleware({
 // Route requests to appropriate services
 app.use('/api/upload', uploadProxy);
 app.use('/api/stream', streamingProxy);
-app.use('/api/transcode', transcodingProxy);
+// Note: Transcoding now happens automatically via Kafka when files are uploaded
 
 // 404 handler
 app.use('*', (req, res) => {

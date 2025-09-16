@@ -68,43 +68,8 @@ app.get('/health', async (_req, res) => {
   });
 });
 
-// Start transcoding job
-app.post('/api/v1/transcode', async (req, res) => {
-  const { jobId, inputPath, outputPath } = req.body;
-  
-  if (!jobId || !inputPath || !outputPath) {
-    return res.status(400).json({
-      success: false,
-      error: 'Missing required fields: jobId, inputPath, outputPath'
-    });
-  }
-
-  try {
-    // Add job to Redis queue
-    if (redisClient) {
-      await redisClient.lPush('transcoding:queue', JSON.stringify({
-        jobId,
-        inputPath,
-        outputPath,
-        status: 'queued',
-        createdAt: new Date().toISOString()
-      }));
-    }
-
-    res.json({
-      success: true,
-      jobId,
-      status: 'queued',
-      message: 'Transcoding job queued successfully'
-    });
-  } catch (error) {
-    console.error('Error queuing transcoding job:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to queue transcoding job'
-    });
-  }
-});
+// Note: Transcoding jobs now come from Kafka, not HTTP API
+// The worker.ts file handles Kafka consumption
 
 // Get transcoding status
 app.get('/api/v1/status/:jobId', async (req, res) => {
