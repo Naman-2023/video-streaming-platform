@@ -11,6 +11,9 @@ console.log('🛑 Stopping existing services...');
 try {
   require('child_process').execSync('pkill -f "npm run dev" 2>/dev/null || true', { stdio: 'ignore' });
   require('child_process').execSync('pkill -f "tsx watch" 2>/dev/null || true', { stdio: 'ignore' });
+  require('child_process').execSync('pkill -f "tsx src/worker.ts" 2>/dev/null || true', { stdio: 'ignore' });
+  require('child_process').execSync('pkill -f "npm run worker" 2>/dev/null || true', { stdio: 'ignore' });
+  console.log('✅ Cleaned up existing processes');
 } catch (e) {
   // Ignore errors
 }
@@ -18,12 +21,18 @@ try {
 // Wait for processes to stop
 setTimeout(() => {
   startServices();
-}, 2000);
+}, 3000);
 
 function startServices() {
   console.log('🚀 Starting services...\n');
 
   const services = [
+    {
+      name: 'API Gateway',
+      port: 3000,
+      path: 'api-gateway',
+      color: '\x1b[33m' // Yellow
+    },
     {
       name: 'Upload Service',
       port: 3001,
@@ -126,6 +135,7 @@ function showStatus(processes) {
   console.log('🎉 VIDEO STREAMING PLATFORM STARTED');
   console.log('='.repeat(60));
   console.log('\n📡 Service URLs:');
+  console.log('  • API Gateway:        http://localhost:3000 (Main Entry Point)');
   console.log('  • Upload Service:     http://localhost:3001');
   console.log('  • Streaming Service:  http://localhost:3004');
   console.log('  • Transcoding Service: http://localhost:3005');
@@ -133,12 +143,12 @@ function showStatus(processes) {
   console.log('\n🧪 Test Interface:');
   console.log('  • Open: test-platform.html in your browser');
   
-  console.log('\n📤 Upload Video:');
+  console.log('\n📤 Upload Video (via API Gateway):');
   console.log('  curl -X POST -F "video=@/path/to/video.mp4;type=video/mp4" \\');
-  console.log('       -F "title=My Video" http://localhost:3001/api/v1/upload/file');
+  console.log('       -F "title=My Video" http://localhost:3000/api/upload/file');
   
-  console.log('\n🎬 Stream Video:');
-  console.log('  http://localhost:3004/api/v1/stream/{jobId}/master.m3u8');
+  console.log('\n🎬 Stream Video (via API Gateway):');
+  console.log('  http://localhost:3000/api/stream/{jobId}/master.m3u8');
   
   console.log('\n🛑 To stop: Press Ctrl+C');
   console.log('='.repeat(60) + '\n');
@@ -148,6 +158,7 @@ async function testConnectivity() {
   console.log('🔍 Testing service connectivity...\n');
   
   const services = [
+    { name: 'API Gateway', url: 'http://localhost:3000/health' },
     { name: 'Upload Service', url: 'http://localhost:3001/health' },
     { name: 'Streaming Service', url: 'http://localhost:3004/health' },
     { name: 'Transcoding Service', url: 'http://localhost:3005/health' }

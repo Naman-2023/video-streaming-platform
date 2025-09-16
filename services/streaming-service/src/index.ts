@@ -44,7 +44,7 @@ app.get('/health', (_req, res) => {
 app.get('/api/v1/stream/:jobId/master.m3u8', (req, res) => {
   const { jobId } = req.params;
   const transcodedDir = path.resolve(process.cwd(), '../../transcoded', jobId);
-  
+
   if (!fs.existsSync(transcodedDir)) {
     return res.status(404).json({ error: 'Video not found' });
   }
@@ -67,7 +67,7 @@ app.get('/api/v1/stream/:jobId/master.m3u8', (req, res) => {
 app.get('/api/v1/stream/:jobId/:quality/playlist.m3u8', (req, res) => {
   const { jobId, quality } = req.params;
   const playlistPath = path.resolve(process.cwd(), '../../transcoded', jobId, quality, 'playlist.m3u8');
-  
+
   if (!fs.existsSync(playlistPath)) {
     return res.status(404).json({ error: 'Playlist not found' });
   }
@@ -79,7 +79,7 @@ app.get('/api/v1/stream/:jobId/:quality/playlist.m3u8', (req, res) => {
 app.get('/api/v1/stream/:jobId/:quality/:segment', (req, res) => {
   const { jobId, quality, segment } = req.params;
   const segmentPath = path.resolve(process.cwd(), '../../transcoded', jobId, quality, segment);
-  
+
   if (!fs.existsSync(segmentPath)) {
     return res.status(404).json({ error: 'Segment not found' });
   }

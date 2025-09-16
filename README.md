@@ -44,6 +44,7 @@ node start-platform.js
 ```
 
 The platform will start on:
+- **API Gateway: http://localhost:3000** (Main Entry Point)
 - Upload Service: http://localhost:3001
 - Streaming Service: http://localhost:3004  
 - Transcoding Service: http://localhost:3005
@@ -52,6 +53,13 @@ The platform will start on:
 
 ### Upload a Video
 
+**Via API Gateway (Recommended):**
+```bash
+curl -X POST -F "video=@your-video.mp4;type=video/mp4" -F "title=My Video" \
+     http://localhost:3000/api/upload/file
+```
+
+**Direct to Upload Service:**
 ```bash
 curl -X POST -F "video=@your-video.mp4;type=video/mp4" -F "title=My Video" \
      http://localhost:3001/api/v1/upload/file
@@ -72,6 +80,12 @@ Response:
 
 ### Check Status
 
+**Via API Gateway (Recommended):**
+```bash
+curl http://localhost:3000/api/upload/status/job_1758010126855_6lecfzv3a
+```
+
+**Direct to Upload Service:**
 ```bash
 curl http://localhost:3001/api/v1/upload/status/job_1758010126855_6lecfzv3a
 ```
@@ -95,13 +109,17 @@ Response:
 
 Once transcoding is complete, stream using:
 
-**Master Playlist (Adaptive):**
+**Via API Gateway (Recommended):**
 ```
-http://localhost:3004/api/v1/stream/job_1758010126855_6lecfzv3a/master.m3u8
+http://localhost:3000/api/stream/job_1758010126855_6lecfzv3a/master.m3u8
+http://localhost:3000/api/stream/job_1758010126855_6lecfzv3a/360p/playlist.m3u8
+http://localhost:3000/api/stream/job_1758010126855_6lecfzv3a/720p/playlist.m3u8
+http://localhost:3000/api/stream/job_1758010126855_6lecfzv3a/1080p/playlist.m3u8
 ```
 
-**Individual Qualities:**
+**Direct to Streaming Service:**
 ```
+http://localhost:3004/api/v1/stream/job_1758010126855_6lecfzv3a/master.m3u8
 http://localhost:3004/api/v1/stream/job_1758010126855_6lecfzv3a/360p/playlist.m3u8
 http://localhost:3004/api/v1/stream/job_1758010126855_6lecfzv3a/720p/playlist.m3u8
 http://localhost:3004/api/v1/stream/job_1758010126855_6lecfzv3a/1080p/playlist.m3u8
@@ -117,6 +135,14 @@ http://localhost:3004/api/v1/stream/job_1758010126855_6lecfzv3a/1080p/playlist.m
 ## Architecture
 
 ```
+                    ┌─────────────────┐
+                    │   API Gateway   │
+                    │   Port: 3000    │ ← Single Entry Point
+                    └─────────────────┘
+                             │
+        ┌────────────────────┼────────────────────┐
+        │                    │                    │
+        ▼                    ▼                    ▼
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
 │  Upload Service │    │ Transcoding      │    │ Streaming       │
 │  Port: 3001     │───▶│ Service          │───▶│ Service         │
@@ -131,6 +157,7 @@ http://localhost:3004/api/v1/stream/job_1758010126855_6lecfzv3a/1080p/playlist.m
 
 ### Services
 
+- **API Gateway**: Single entry point with routing, rate limiting, and health checks
 - **Upload Service**: Handles file uploads and triggers transcoding
 - **Transcoding Service**: Converts videos to multiple qualities using FFmpeg
 - **Streaming Service**: Serves HLS playlists and video segments
@@ -139,6 +166,9 @@ http://localhost:3004/api/v1/stream/job_1758010126855_6lecfzv3a/1080p/playlist.m
 
 ```
 video-streaming-platform/
+├── api-gateway/                 # API Gateway (Port 3000)
+│   └── src/
+│       └── index.ts            # Main gateway with routing
 ├── services/
 │   ├── upload-service/          # File upload and management
 │   │   └── src/

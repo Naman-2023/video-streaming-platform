@@ -22,23 +22,40 @@ async function initRedis() {
   }
 }
 
-async function transcodeVideo(jobId: string, inputPath: string, outputPath: string) {
-  console.log(`Starting transcoding job ${jobId}`);
-  
-  try {
-    // Update status to processing
-    if (redisClient) {
+async function updateProgress(jobId: string, progress: number, message?: string) {
+  if (redisClient) {
+    try {
       await redisClient.set(`transcoding:status:${jobId}`, JSON.stringify({
         status: 'processing',
-        progress: 0,
+        progress: Math.round(progress),
+        message: message || `Processing... ${Math.round(progress)}%`,
         updatedAt: new Date().toISOString()
       }));
+    } catch (error) {
+      console.error(`Failed to update progress for job ${jobId}:`, error);
     }
+  }
+}
+
+async function transcodeVideo(jobId: string, inputPath: string, outputPath: string) {
+  console.log(`🎬 Starting transcoding job ${jobId}`);
+  console.log(`📁 Input: ${inputPath}`);
+  console.log(`📁 Output: ${outputPath}`);
+  
+  try {
+    // Validate input file exists
+    if (!fs.existsSync(inputPath)) {
+      throw new Error(`Input file not found: ${inputPath}`);
+    }
+
+    // Update status to processing
+    await updateProgress(jobId, 0, 'Initializing transcoding...');
 
     // Create output directory with absolute path
     const outputDir = path.resolve(outputPath);
     if (!fs.existsSync(outputDir)) {
       fs.mkdirSync(outputDir, { recursive: true });
+      console.log(`📁 Created output directory: ${outputDir}`);
     }
 
     // Create quality directories
@@ -50,8 +67,11 @@ async function transcodeVideo(jobId: string, inputPath: string, outputPath: stri
       }
     }
 
-    // Transcode to different qualities
-    const transcodingPromises = qualities.map(quality => {
+    await updateProgress(jobId, 10, 'Starting quality transcoding...');
+
+    // Transcode to different qualities with progress tracking
+    let completedQualities = 0;
+    const transcodingPromises = qualities.map((quality, index) => {
       return new Promise((resolve, reject) => {
         const qualityDir = path.join(outputDir, quality);
         const playlistPath = path.join(qualityDir, 'playlist.m3u8');
@@ -85,23 +105,95 @@ async function transcodeVideo(jobId: string, inputPath: string, outputPath: stri
           '-hls_time', '10',
           '-hls_list_size', '0',
           '-f', 'hls',
+          '-progress', 'pipe:1',  // Enable progress output
           playlistPath
         ];
 
+        console.log(`🔄 Starting ${quality} transcoding for job ${jobId}`);
         const ffmpeg = spawn('ffmpeg', ffmpegArgs);
+        
+        let duration = 0;
+        let currentTime = 0;
+
+        // Parse FFmpeg output for progress
+        ffmpeg.stdout?.on('data', (data) => {
+          const output = data.toString();
+          
+          // Extract duration (only once)
+          if (duration === 0) {
+            const durationMatch = output.match(/Duration: (\d{2}):(\d{2}):(\d{2})/);
+            if (durationMatch) {
+              const hours = parseInt(durationMatch[1]);
+              const minutes = parseInt(durationMatch[2]);
+              const seconds = parseInt(durationMatch[3]);
+              duration = hours * 3600 + minutes * 60 + seconds;
+            }
+          }
+
+          // Extract current time
+          const timeMatch = output.match(/time=(\d{2}):(\d{2}):(\d{2})/);
+          if (timeMatch && duration > 0) {
+            const hours = parseInt(timeMatch[1]);
+            const minutes = parseInt(timeMatch[2]);
+            const seconds = parseInt(timeMatch[3]);
+            currentTime = hours * 3600 + minutes * 60 + seconds;
+            
+            const qualityProgress = (currentTime / duration) * 100;
+            const overallProgress = 10 + ((completedQualities + (qualityProgress / 100)) / qualities.length) * 80;
+            
+            updateProgress(jobId, overallProgress, `Transcoding ${quality}: ${Math.round(qualityProgress)}%`);
+          }
+        });
+
+        ffmpeg.stderr?.on('data', (data) => {
+          const output = data.toString();
+          
+          // Extract duration from stderr if not found in stdout
+          if (duration === 0) {
+            const durationMatch = output.match(/Duration: (\d{2}):(\d{2}):(\d{2})/);
+            if (durationMatch) {
+              const hours = parseInt(durationMatch[1]);
+              const minutes = parseInt(durationMatch[2]);
+              const seconds = parseInt(durationMatch[3]);
+              duration = hours * 3600 + minutes * 60 + seconds;
+            }
+          }
+
+          // Extract progress from stderr
+          const timeMatch = output.match(/time=(\d{2}):(\d{2}):(\d{2})/);
+          if (timeMatch && duration > 0) {
+            const hours = parseInt(timeMatch[1]);
+            const minutes = parseInt(timeMatch[2]);
+            const seconds = parseInt(timeMatch[3]);
+            currentTime = hours * 3600 + minutes * 60 + seconds;
+            
+            const qualityProgress = (currentTime / duration) * 100;
+            const overallProgress = 10 + ((completedQualities + (qualityProgress / 100)) / qualities.length) * 80;
+            
+            updateProgress(jobId, overallProgress, `Transcoding ${quality}: ${Math.round(qualityProgress)}%`);
+          }
+
+          // Log errors but don't fail on warnings
+          if (output.includes('Error') || output.includes('error')) {
+            console.error(`⚠️  FFmpeg ${quality} warning/error:`, output.trim());
+          }
+        });
         
         ffmpeg.on('close', (code) => {
           if (code === 0) {
-            console.log(`${quality} transcoding completed for job ${jobId}`);
+            completedQualities++;
+            const overallProgress = 10 + (completedQualities / qualities.length) * 80;
+            console.log(`✅ ${quality} transcoding completed for job ${jobId}`);
+            updateProgress(jobId, overallProgress, `${quality} completed (${completedQualities}/${qualities.length})`);
             resolve(quality);
           } else {
-            console.error(`${quality} transcoding failed for job ${jobId} with code ${code}`);
-            reject(new Error(`FFmpeg failed with code ${code}`));
+            console.error(`❌ ${quality} transcoding failed for job ${jobId} with exit code ${code}`);
+            reject(new Error(`FFmpeg failed with exit code ${code} for ${quality}`));
           }
         });
 
         ffmpeg.on('error', (error) => {
-          console.error(`${quality} transcoding error for job ${jobId}:`, error);
+          console.error(`❌ ${quality} transcoding process error for job ${jobId}:`, error);
           reject(error);
         });
       });
@@ -115,63 +207,126 @@ async function transcodeVideo(jobId: string, inputPath: string, outputPath: stri
       await redisClient.set(`transcoding:status:${jobId}`, JSON.stringify({
         status: 'completed',
         progress: 100,
+        message: 'All qualities transcoded successfully',
         completedAt: new Date().toISOString()
       }));
     }
 
-    console.log(`Transcoding job ${jobId} completed successfully`);
+    console.log(`🎉 Transcoding job ${jobId} completed successfully`);
     
   } catch (error) {
-    console.error(`Transcoding job ${jobId} failed:`, error);
+    console.error(`💥 Transcoding job ${jobId} failed:`, error);
     
     // Update status to failed
     if (redisClient) {
       await redisClient.set(`transcoding:status:${jobId}`, JSON.stringify({
         status: 'failed',
+        progress: 0,
         error: error instanceof Error ? error.message : 'Unknown error',
+        message: 'Transcoding failed',
         failedAt: new Date().toISOString()
       }));
     }
+    
+    throw error; // Re-throw to handle in processQueue
   }
 }
 
 async function processQueue() {
-  if (!redisClient) return;
+  if (!redisClient) {
+    console.warn('⚠️  Redis client not available, skipping queue check');
+    return;
+  }
 
   try {
-    // Get job from queue
+    // Get job from queue with timeout
     const jobData = await redisClient.brPop('transcoding:queue', 5);
     
     if (jobData) {
       const job = JSON.parse(jobData.element);
+      console.log(`📥 Processing job from queue:`, {
+        jobId: job.jobId,
+        inputPath: job.inputPath,
+        outputPath: job.outputPath
+      });
+      
       await transcodeVideo(job.jobId, job.inputPath, job.outputPath);
     }
   } catch (error) {
-    console.error('Error processing queue:', error);
+    console.error('💥 Error processing queue:', error);
+    
+    // Wait a bit before retrying on error
+    await new Promise(resolve => setTimeout(resolve, 5000));
   }
 }
 
+let isShuttingDown = false;
+
 async function startWorker() {
   console.log('🔧 Starting Transcoding Worker...');
+  console.log(`🆔 Worker PID: ${process.pid}`);
   
   await initRedis();
   
   // Process queue continuously
-  while (true) {
-    await processQueue();
-    await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second between checks
+  while (!isShuttingDown) {
+    try {
+      await processQueue();
+      
+      // Short wait between queue checks
+      if (!isShuttingDown) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    } catch (error) {
+      console.error('💥 Worker loop error:', error);
+      
+      // Wait longer on error to prevent spam
+      if (!isShuttingDown) {
+        await new Promise(resolve => setTimeout(resolve, 5000));
+      }
+    }
   }
+  
+  console.log('🔌 Worker loop ended');
 }
 
-// Handle shutdown
-process.on('SIGTERM', () => {
-  console.log('Worker shutting down...');
+// Graceful shutdown handling
+async function shutdown() {
+  if (isShuttingDown) return;
+  
+  console.log('🛑 Worker shutting down gracefully...');
+  isShuttingDown = true;
+  
+  // Close Redis connection
+  if (redisClient) {
+    try {
+      await redisClient.disconnect();
+      console.log('🔌 Redis connection closed');
+    } catch (error) {
+      console.error('Error closing Redis connection:', error);
+    }
+  }
+  
+  console.log('✅ Worker shutdown complete');
   process.exit(0);
+}
+
+// Handle shutdown signals
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (error) => {
+  console.error('💥 Uncaught Exception:', error);
+  shutdown();
 });
 
-process.on('SIGINT', () => {
-  console.log('Worker shutting down...');
-  process.exit(0);
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('💥 Unhandled Rejection at:', promise, 'reason:', reason);
+  shutdown();
 });
 
-startWorker();
+startWorker().catch((error) => {
+  console.error('💥 Failed to start worker:', error);
+  process.exit(1);
+});
