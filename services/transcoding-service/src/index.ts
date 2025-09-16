@@ -36,7 +36,7 @@ async function initRedis() {
 }
 
 // Root endpoint
-app.get('/', (req, res) => {
+app.get('/', (_req, res) => {
   res.json({
     service: 'transcoding-service',
     version: '1.0.0',
@@ -49,7 +49,7 @@ app.get('/', (req, res) => {
 });
 
 // Simple health check
-app.get('/health', async (req, res) => {
+app.get('/health', async (_req, res) => {
   let redisStatus = 'disconnected';
   try {
     if (redisClient) {
@@ -135,7 +135,7 @@ app.get('/api/v1/status/:jobId', async (req, res) => {
 });
 
 // Error handler
-app.use((error: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
+app.use((error: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error('Transcoding service error:', error.message);
   res.status(500).json({
     success: false,

@@ -18,7 +18,7 @@ app.use((req, res, next) => {
 });
 
 // Root endpoint
-app.get('/', (req, res) => {
+app.get('/', (_req, res) => {
   res.json({
     service: 'streaming-service',
     version: '1.0.0',
@@ -32,7 +32,7 @@ app.get('/', (req, res) => {
 });
 
 // Simple health check
-app.get('/health', (req, res) => {
+app.get('/health', (_req, res) => {
   res.json({
     service: 'streaming-service',
     status: 'healthy',
@@ -89,7 +89,7 @@ app.get('/api/v1/stream/:jobId/:quality/:segment', (req, res) => {
 });
 
 // Error handler
-app.use((error: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
+app.use((error: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error('Streaming service error:', error.message);
   res.status(500).json({
     success: false,

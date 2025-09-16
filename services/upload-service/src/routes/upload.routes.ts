@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs-extra';
+import axios from 'axios';
 
 // Configure multer for file uploads
 const upload = multer({
@@ -29,7 +30,7 @@ const router = Router();
 
 // Create job ID
 const createJobId = () => {
-  return `job_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  return `job_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 };
 
 // POST /api/v1/upload/file - Upload video file
@@ -69,7 +70,6 @@ router.post('/file', upload.single('video'), async (req: Request, res: Response)
       });
 
       // Call transcoding service API
-      const axios = require('axios');
       const transcodingResponse = await axios.post('http://localhost:3005/api/v1/transcode', {
         jobId,
         inputPath: absoluteInputPath,
@@ -176,7 +176,6 @@ router.get('/status/:jobId', async (req: Request, res: Response): Promise<any> =
 
     // Check if transcoding is complete by looking for output files
     const transcodedPath = path.resolve('../../transcoded', jobId);
-    const masterPlaylistPath = path.join(transcodedPath, 'master.m3u8');
     
     let status = 'QUEUED';
     let progress = 0;
@@ -242,7 +241,7 @@ router.get('/status/:jobId', async (req: Request, res: Response): Promise<any> =
 });
 
 // GET /api/v1/upload/formats - Get supported formats
-router.get('/formats', (req: Request, res: Response) => {
+router.get('/formats', (_req: Request, res: Response) => {
   const supportedFormats = {
     video: [
       { format: 'mp4', description: 'MPEG-4 Video' },
