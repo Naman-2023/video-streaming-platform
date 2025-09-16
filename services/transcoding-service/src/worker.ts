@@ -1,15 +1,14 @@
-import * as Redis from 'redis';
+import { createClient } from 'redis';
 import { spawn } from 'child_process';
-import fs from 'fs';
-import path from 'path';
+import * as fs from 'fs';
+import * as path from 'path';
 
 let redisClient: any;
 
 async function initRedis() {
   try {
-    redisClient = Redis.createClient({
-      host: process.env.REDIS_HOST || 'localhost',
-      port: parseInt(process.env.REDIS_PORT || '6379')
+    redisClient = createClient({
+      url: `redis://${process.env.REDIS_HOST || 'localhost'}:${process.env.REDIS_PORT || '6379'}`
     });
     
     redisClient.on('error', (err: any) => {
@@ -57,7 +56,7 @@ async function transcodeVideo(jobId: string, inputPath: string, outputPath: stri
         const qualityDir = path.join(outputDir, quality);
         const playlistPath = path.join(qualityDir, 'playlist.m3u8');
         
-        let resolution, bitrate;
+        let resolution: string, bitrate: string;
         switch (quality) {
           case '360p':
             resolution = '640x360';
@@ -71,6 +70,9 @@ async function transcodeVideo(jobId: string, inputPath: string, outputPath: stri
             resolution = '1920x1080';
             bitrate = '2800k';
             break;
+          default:
+            resolution = '640x360';
+            bitrate = '800k';
         }
 
         const ffmpegArgs = [

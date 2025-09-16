@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import path from 'path';
-import * as fs from 'fs-extra';
+import fs from 'fs-extra';
 
 // Configure multer for file uploads
 const upload = multer({

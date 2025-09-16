@@ -61,7 +61,7 @@ app.get('/api/v1/stream/:jobId/master.m3u8', (req, res) => {
 `;
 
   res.set('Content-Type', 'application/vnd.apple.mpegurl');
-  res.send(masterPlaylist);
+  return res.send(masterPlaylist);
 });
 
 app.get('/api/v1/stream/:jobId/:quality/playlist.m3u8', (req, res) => {
@@ -73,7 +73,7 @@ app.get('/api/v1/stream/:jobId/:quality/playlist.m3u8', (req, res) => {
   }
 
   res.set('Content-Type', 'application/vnd.apple.mpegurl');
-  res.sendFile(playlistPath);
+  return res.sendFile(playlistPath);
 });
 
 app.get('/api/v1/stream/:jobId/:quality/:segment', (req, res) => {
@@ -85,7 +85,7 @@ app.get('/api/v1/stream/:jobId/:quality/:segment', (req, res) => {
   }
 
   res.set('Content-Type', 'video/mp2t');
-  res.sendFile(segmentPath);
+  return res.sendFile(segmentPath);
 });
 
 // Error handler

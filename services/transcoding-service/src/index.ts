@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import * as Redis from 'redis';
+import { createClient } from 'redis';
 
 const app = express();
 let redisClient: any;
@@ -20,9 +20,8 @@ app.use((req, res, next) => {
 // Initialize Redis connection
 async function initRedis() {
   try {
-    redisClient = Redis.createClient({
-      host: process.env.REDIS_HOST || 'localhost',
-      port: parseInt(process.env.REDIS_PORT || '6379')
+    redisClient = createClient({
+      url: `redis://${process.env.REDIS_HOST || 'localhost'}:${process.env.REDIS_PORT || '6379'}`
     });
     
     redisClient.on('error', (err: any) => {

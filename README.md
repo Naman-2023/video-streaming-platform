@@ -1,14 +1,17 @@
 # Video Streaming Platform
 
-A simple microservices-based video streaming platform with automatic transcoding and HLS streaming.
+A production-ready microservices-based video streaming platform with automatic transcoding and HLS streaming.
 
 ## Features
 
-- 🎬 **Video Upload**: Upload MP4 videos via REST API
+- 🎬 **Video Upload**: Upload multiple video formats (MP4, AVI, MOV, MKV, WebM, FLV)
 - 🔄 **Auto Transcoding**: Automatic conversion to multiple qualities (360p, 720p, 1080p)
 - 📺 **HLS Streaming**: HTTP Live Streaming with adaptive bitrate
 - ⚡ **Real-time Status**: Track upload and transcoding progress
-- 🎯 **Simple Architecture**: Three focused microservices
+- 🎯 **Clean Architecture**: Three optimized microservices
+- 🔒 **Security**: Helmet.js security headers and CORS protection
+- 📊 **Health Monitoring**: Built-in health checks for all services
+- 🚀 **TypeScript**: Full TypeScript implementation with strict typing
 
 ## Quick Start
 
@@ -31,6 +34,7 @@ npm install
 cd services/upload-service && npm install
 cd ../streaming-service && npm install  
 cd ../transcoding-service && npm install
+cd ../..
 ```
 
 ### 3. Start Platform
@@ -49,7 +53,7 @@ The platform will start on:
 ### Upload a Video
 
 ```bash
-curl -X POST -F "video=@your-video.mp4" -F "title=My Video" \
+curl -X POST -F "video=@your-video.mp4;type=video/mp4" -F "title=My Video" \
      http://localhost:3001/api/v1/upload/file
 ```
 
@@ -58,17 +62,33 @@ Response:
 {
   "success": true,
   "data": {
-    "jobId": "job_1234567890_abcdef",
+    "jobId": "job_1758010126855_6lecfzv3a",
     "status": "QUEUED",
     "message": "File uploaded successfully and queued for processing"
-  }
+  },
+  "timestamp": "2025-09-16T08:08:46.869Z"
 }
 ```
 
 ### Check Status
 
 ```bash
-curl http://localhost:3001/api/v1/upload/status/job_1234567890_abcdef
+curl http://localhost:3001/api/v1/upload/status/job_1758010126855_6lecfzv3a
+```
+
+Response:
+```json
+{
+  "success": true,
+  "data": {
+    "jobId": "job_1758010126855_6lecfzv3a",
+    "status": "COMPLETED",
+    "progress": 100,
+    "currentStep": "Transcoding completed successfully",
+    "estimatedTimeRemaining": 0
+  },
+  "timestamp": "2025-09-16T08:08:59.641Z"
+}
 ```
 
 ### Stream Video
@@ -77,14 +97,14 @@ Once transcoding is complete, stream using:
 
 **Master Playlist (Adaptive):**
 ```
-http://localhost:3004/api/v1/stream/job_1234567890_abcdef/master.m3u8
+http://localhost:3004/api/v1/stream/job_1758010126855_6lecfzv3a/master.m3u8
 ```
 
 **Individual Qualities:**
 ```
-http://localhost:3004/api/v1/stream/job_1234567890_abcdef/360p/playlist.m3u8
-http://localhost:3004/api/v1/stream/job_1234567890_abcdef/720p/playlist.m3u8
-http://localhost:3004/api/v1/stream/job_1234567890_abcdef/1080p/playlist.m3u8
+http://localhost:3004/api/v1/stream/job_1758010126855_6lecfzv3a/360p/playlist.m3u8
+http://localhost:3004/api/v1/stream/job_1758010126855_6lecfzv3a/720p/playlist.m3u8
+http://localhost:3004/api/v1/stream/job_1758010126855_6lecfzv3a/1080p/playlist.m3u8
 ```
 
 ### Play in VLC
@@ -121,14 +141,31 @@ http://localhost:3004/api/v1/stream/job_1234567890_abcdef/1080p/playlist.m3u8
 video-streaming-platform/
 ├── services/
 │   ├── upload-service/          # File upload and management
+│   │   └── src/
+│   │       ├── routes/          # Upload API routes
+│   │       ├── index.ts         # Main entry point
+│   │       └── routes.ts        # Route exports
 │   ├── streaming-service/       # HLS streaming
+│   │   └── src/
+│   │       └── index.ts         # Main entry point with streaming routes
 │   └── transcoding-service/     # Video processing
+│       └── src/
+│           ├── index.ts         # Main API entry point
+│           └── worker.ts        # Worker process entry point
 ├── transcoded/                  # Processed video files
 ├── start-platform.js           # Platform launcher
+├── test-platform.sh           # Comprehensive test suite
 └── README.md                   # This file
 ```
 
 ## Development
+
+### Test Platform
+
+Run comprehensive tests:
+```bash
+./test-platform.sh
+```
 
 ### Stop Platform
 
@@ -138,12 +175,23 @@ Press `Ctrl+C` in the terminal running `start-platform.js`
 
 ```bash
 rm -rf transcoded/*
+rm -rf services/upload-service/uploads/*
 ```
 
 ### Reset Redis
 
 ```bash
 docker exec redis-server redis-cli flushall
+```
+
+### Build Services
+
+```bash
+# Build all services
+npm run build
+
+# Build individual service
+cd services/upload-service && npm run build
 ```
 
 ## Troubleshooting
