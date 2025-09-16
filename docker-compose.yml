@@ -21,26 +21,37 @@ services:
       start_period: 60s
     restart: unless-stopped
 
-  # Redis for status and rate limiting
+  # Redis for status cache and rate limiting
   redis:
     image: redis:7-alpine
+    container_name: video-platform-redis
     ports:
       - "6379:6379"
     volumes:
       - redis-data:/data
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
-  # Kafka setup for job queue
+  # Zookeeper for Kafka coordination
   zookeeper:
     image: confluentinc/cp-zookeeper:latest
+    container_name: video-platform-zookeeper
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
     ports:
       - "2181:2181"
+    restart: unless-stopped
 
+  # Kafka for event streaming and job queue
   kafka:
     image: confluentinc/cp-kafka:latest
+    container_name: video-platform-kafka
     depends_on:
       - zookeeper
     ports:
@@ -51,6 +62,18 @@ services:
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: true
+      KAFKA_LOG_RETENTION_HOURS: 24
+      KAFKA_LOG_SEGMENT_BYTES: 1073741824
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
 
 volumes:
   redis-data:
+  kafka-data:

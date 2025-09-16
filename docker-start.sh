@@ -1,25 +1,33 @@
 #!/bin/bash
 
-# Docker startup script for Video Streaming Platform
+# Docker startup script for Video Streaming Platform with Kafka
 
-echo "🐳 Starting Video Streaming Platform in Docker"
-echo "=============================================="
+echo "🐳 Starting Event-Driven Video Streaming Platform in Docker"
+echo "=========================================================="
 
-# Start Redis in background
-echo "Starting Redis server..."
-redis-server --daemonize yes --port 6379
+# Wait for external infrastructure (Kafka, Redis, Zookeeper)
+echo "Waiting for infrastructure to be ready..."
 
-# Wait for Redis to be ready
-sleep 3
+# Wait for Redis
+echo -n "Waiting for Redis... "
+while ! nc -z redis 6379; do
+    sleep 1
+    echo -n "."
+done
+echo " ✅ Redis ready"
 
-# Verify Redis is running
-if redis-cli ping > /dev/null 2>&1; then
-    echo "✅ Redis server started successfully"
-else
-    echo "❌ Failed to start Redis server"
-    exit 1
-fi
+# Wait for Kafka
+echo -n "Waiting for Kafka... "
+while ! nc -z kafka 9092; do
+    sleep 1
+    echo -n "."
+done
+echo " ✅ Kafka ready"
+
+# Additional wait for Kafka to be fully ready
+sleep 10
+
+echo "🚀 Infrastructure ready, starting platform services..."
 
 # Start the platform
-echo "Starting video streaming platform..."
 exec node start-platform.js

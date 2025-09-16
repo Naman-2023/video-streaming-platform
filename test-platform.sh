@@ -114,12 +114,19 @@ test_service_health() {
     test_http "Transcoding Service Health" "http://localhost:3005/health" "200" "transcoding-service"
 }
 
-# Test Redis connection
-test_redis() {
-    echo -e "\n${YELLOW}2. Testing Redis Connection${NC}"
+# Test infrastructure connections
+test_infrastructure() {
+    echo -e "\n${YELLOW}2. Testing Infrastructure${NC}"
     
-    run_test "Redis Connection" "docker exec redis-server redis-cli ping" "PONG"
-    run_test "Redis Keys" "docker exec redis-server redis-cli keys '*'" ""
+    # Test Redis
+    run_test "Redis Connection" "docker exec video-streaming-platform-redis-1 redis-cli ping" "PONG"
+    run_test "Redis Keys" "docker exec video-streaming-platform-redis-1 redis-cli keys '*'" ""
+    
+    # Test Kafka
+    run_test "Kafka Connection" "docker exec video-streaming-platform-kafka-1 kafka-topics --bootstrap-server localhost:9092 --list" ""
+    
+    # Test Zookeeper
+    run_test "Zookeeper Connection" "docker exec video-streaming-platform-zookeeper-1 echo 'ruok' | nc localhost 2181" "imok"
 }
 
 # Test video upload
@@ -300,7 +307,7 @@ main() {
     
     # Run all tests
     test_service_health
-    test_redis
+    test_infrastructure
     test_video_upload
     test_error_handling
     test_concurrent_operations
@@ -326,7 +333,7 @@ case "${1:-}" in
     --quick|-q)
         echo "Running quick tests..."
         test_service_health
-        test_redis
+        test_infrastructure
         print_summary
         ;;
     *)

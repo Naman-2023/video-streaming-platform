@@ -1,12 +1,12 @@
-# Video Streaming Platform - Complete Docker Setup
+# Video Streaming Platform - Event-Driven with Kafka
 FROM node:18-alpine
 
 # Install FFmpeg and other dependencies
 RUN apk add --no-cache \
     ffmpeg \
-    redis \
     bash \
-    curl
+    curl \
+    netcat-openbsd
 
 # Set working directory
 WORKDIR /app
@@ -15,6 +15,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Copy service package files
+COPY services/shared/package*.json ./services/shared/ 2>/dev/null || true
 COPY services/upload-service/package*.json ./services/upload-service/
 COPY services/streaming-service/package*.json ./services/streaming-service/
 COPY services/transcoding-service/package*.json ./services/transcoding-service/
@@ -34,8 +35,8 @@ RUN mkdir -p transcoded services/upload-service/uploads
 # Set permissions
 RUN chmod +x start-platform.js install.sh test-platform.sh
 
-# Expose ports
-EXPOSE 3001 3004 3005 6379
+# Expose ports (infrastructure runs in separate containers)
+EXPOSE 3001 3004 3005
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \

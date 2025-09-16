@@ -4,7 +4,25 @@ const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 
-console.log('🎬 Starting Video Streaming Platform...\n');
+console.log('🎬 Starting Video Streaming Platform with Kafka...\n');
+
+// Check infrastructure
+console.log('🔍 Checking infrastructure...');
+try {
+  require('child_process').execSync('docker-compose ps', { stdio: 'ignore' });
+  console.log('✅ Docker Compose infrastructure is running');
+} catch (e) {
+  console.log('⚠️  Infrastructure not running. Starting with docker-compose...');
+  try {
+    require('child_process').execSync('docker-compose up -d', { stdio: 'inherit' });
+    console.log('✅ Infrastructure started');
+    console.log('⏳ Waiting for Kafka to be ready...');
+    require('child_process').execSync('sleep 10', { stdio: 'ignore' });
+  } catch (error) {
+    console.log('❌ Failed to start infrastructure. Please run: docker-compose up -d');
+    process.exit(1);
+  }
+}
 
 // Kill existing processes
 console.log('🛑 Stopping existing services...');
@@ -87,30 +105,58 @@ function startServices() {
     }, index * 2000); // Stagger startup by 2 seconds
   });
 
-  // Start transcoding worker after services
+  // Start transcoding workers after services
   setTimeout(() => {
-    console.log('\x1b[37m🔧 Starting Transcoding Worker...\x1b[0m');
+    console.log('\x1b[37m🔧 Starting Transcoding Workers (Kafka Consumers)...\x1b[0m');
     
-    const worker = spawn('npm', ['run', 'worker'], {
+    // Start primary worker
+    const worker1 = spawn('npm', ['run', 'worker'], {
       cwd: 'services/transcoding-service',
       stdio: ['ignore', 'pipe', 'pipe']
     });
 
-    worker.stdout.on('data', (data) => {
+    worker1.stdout.on('data', (data) => {
       const output = data.toString().trim();
       if (output) {
-        console.log('\x1b[37m[Transcoding Worker]\x1b[0m', output);
+        console.log('\x1b[37m[Worker-1]\x1b[0m', output);
       }
     });
 
-    worker.stderr.on('data', (data) => {
+    worker1.stderr.on('data', (data) => {
       const output = data.toString().trim();
       if (output && !output.includes('ExperimentalWarning')) {
-        console.log('\x1b[37m[Transcoding Worker ERROR]\x1b[0m', output);
+        console.log('\x1b[37m[Worker-1 ERROR]\x1b[0m', output);
       }
     });
 
-    processes.push({ name: 'Transcoding Worker', process: worker });
+    processes.push({ name: 'Transcoding Worker-1', process: worker1 });
+
+    // Start second worker for load balancing (optional)
+    setTimeout(() => {
+      console.log('\x1b[90m🔧 Starting additional worker for load balancing...\x1b[0m');
+      
+      const worker2 = spawn('npm', ['run', 'worker'], {
+        cwd: 'services/transcoding-service',
+        stdio: ['ignore', 'pipe', 'pipe']
+      });
+
+      worker2.stdout.on('data', (data) => {
+        const output = data.toString().trim();
+        if (output) {
+          console.log('\x1b[90m[Worker-2]\x1b[0m', output);
+        }
+      });
+
+      worker2.stderr.on('data', (data) => {
+        const output = data.toString().trim();
+        if (output && !output.includes('ExperimentalWarning')) {
+          console.log('\x1b[90m[Worker-2 ERROR]\x1b[0m', output);
+        }
+      });
+
+      processes.push({ name: 'Transcoding Worker-2', process: worker2 });
+    }, 3000);
+    
   }, services.length * 2000 + 3000);
 
   // Show status after all services start
@@ -140,10 +186,15 @@ function showStatus(processes) {
   console.log('  • Streaming Service:  http://localhost:3004');
   console.log('  • Transcoding Service: http://localhost:3005');
   
+  console.log('\n🚀 Infrastructure:');
+  console.log('  • Kafka:              localhost:9092 (Event Streaming)');
+  console.log('  • Zookeeper:          localhost:2181 (Coordination)');
+  console.log('  • Redis:              localhost:6379 (Status Cache)');
+  
   console.log('\n🧪 Test Interface:');
   console.log('  • Open: test-platform.html in your browser');
   
-  console.log('\n📤 Upload Video (via API Gateway):');
+  console.log('\n📤 Upload Video (Automatic Transcoding):');
   console.log('  curl -X POST -F "video=@/path/to/video.mp4;type=video/mp4" \\');
   console.log('       -F "title=My Video" http://localhost:3000/api/upload/file');
   
@@ -180,17 +231,26 @@ async function testConnectivity() {
     }
   }
   
-  // Test Redis connection
+  // Test infrastructure connections
   try {
     const { execSync } = require('child_process');
-    execSync('docker exec redis-server redis-cli ping', { stdio: 'ignore' });
+    execSync('docker exec video-streaming-platform-redis-1 redis-cli ping', { stdio: 'ignore' });
     console.log('✅ Redis: Connected');
   } catch (error) {
     console.log('❌ Redis: Not connected');
-    console.log('   Run: docker run -d --name redis-server -p 6379:6379 redis:7-alpine');
+    console.log('   Run: docker-compose up -d');
+  }
+
+  try {
+    const { execSync } = require('child_process');
+    execSync('docker exec video-streaming-platform-kafka-1 kafka-topics --bootstrap-server localhost:9092 --list', { stdio: 'ignore' });
+    console.log('✅ Kafka: Connected');
+  } catch (error) {
+    console.log('❌ Kafka: Not connected');
+    console.log('   Run: docker-compose up -d');
   }
   
-  console.log('\n🎯 Platform is ready for video uploads and streaming!\n');
+  console.log('\n🎯 Event-driven platform is ready for video uploads and streaming!\n');
 }
 
 // Add fetch polyfill for Node.js < 18

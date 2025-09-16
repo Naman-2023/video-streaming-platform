@@ -182,28 +182,40 @@ install_docker() {
     fi
 }
 
-# Start Redis
-start_redis() {
-    print_status "Starting Redis server..."
+# Start infrastructure (Kafka, Zookeeper, Redis)
+start_infrastructure() {
+    print_status "Starting infrastructure with Docker Compose..."
     
-    # Check if Redis container already exists
-    if docker ps -a | grep -q redis-server; then
-        print_status "Redis container exists, starting it..."
-        docker start redis-server >/dev/null 2>&1 || true
-    else
-        print_status "Creating new Redis container..."
-        docker run -d --name redis-server -p 6379:6379 redis:7-alpine
-    fi
-    
-    # Wait for Redis to be ready
-    sleep 3
-    
-    if docker exec redis-server redis-cli ping >/dev/null 2>&1; then
-        print_success "Redis server is running"
-    else
-        print_error "Failed to start Redis server"
+    # Check if docker-compose.yml exists
+    if [ ! -f "docker-compose.yml" ]; then
+        print_error "docker-compose.yml not found"
         exit 1
     fi
+    
+    # Start infrastructure
+    docker-compose up -d
+    
+    # Wait for services to be ready
+    print_status "Waiting for infrastructure to be ready..."
+    sleep 15
+    
+    # Test Redis
+    if docker exec video-streaming-platform-redis-1 redis-cli ping >/dev/null 2>&1; then
+        print_success "Redis is running"
+    else
+        print_error "Failed to start Redis"
+        exit 1
+    fi
+    
+    # Test Kafka
+    if docker exec video-streaming-platform-kafka-1 kafka-topics --bootstrap-server localhost:9092 --list >/dev/null 2>&1; then
+        print_success "Kafka is running"
+    else
+        print_error "Failed to start Kafka"
+        exit 1
+    fi
+    
+    print_success "Infrastructure is running"
 }
 
 # Install project dependencies
@@ -264,8 +276,14 @@ test_installation() {
     fi
     
     # Test Redis
-    if ! docker exec redis-server redis-cli ping >/dev/null 2>&1; then
+    if ! docker exec video-streaming-platform-redis-1 redis-cli ping >/dev/null 2>&1; then
         print_error "Redis test failed"
+        return 1
+    fi
+    
+    # Test Kafka
+    if ! docker exec video-streaming-platform-kafka-1 kafka-topics --bootstrap-server localhost:9092 --list >/dev/null 2>&1; then
+        print_error "Kafka test failed"
         return 1
     fi
     
@@ -296,8 +314,8 @@ main() {
         print_status "Attempting to continue with Docker setup..."
     fi
     
-    # Start Redis
-    start_redis
+    # Start infrastructure
+    start_infrastructure
     
     # Create directories
     create_directories
@@ -310,10 +328,18 @@ main() {
         echo ""
         echo "🎉 Installation completed successfully!"
         echo ""
+        echo "🎉 Event-Driven Video Streaming Platform Ready!"
+        echo ""
         echo "Next steps:"
         echo "1. Start the platform: node start-platform.js"
-        echo "2. Upload a video: curl -X POST -F \"video=@video.mp4\" -F \"title=My Video\" http://localhost:3001/api/v1/upload/file"
-        echo "3. Stream the video in VLC using the returned job ID"
+        echo "2. Upload a video: curl -X POST -F \"video=@video.mp4\" -F \"title=My Video\" http://localhost:3000/api/upload/file"
+        echo "3. Transcoding starts automatically via Kafka!"
+        echo "4. Stream the video in VLC using the returned job ID"
+        echo ""
+        echo "Infrastructure running:"
+        echo "• Kafka (Event Streaming): localhost:9092"
+        echo "• Redis (Status Cache): localhost:6379"
+        echo "• Zookeeper (Coordination): localhost:2181"
         echo ""
         echo "For more information, see README.md"
         echo ""
