@@ -30,6 +30,7 @@ docker-compose up -d
 ```
 
 This starts:
+
 - **Kafka**: Event streaming platform (Port 9092)
 - **Zookeeper**: Kafka coordination service (Port 2181)
 - **Redis**: Status cache and rate limiting (Port 6379)
@@ -39,7 +40,7 @@ This starts:
 ```bash
 npm install
 cd services/upload-service && npm install
-cd ../streaming-service && npm install  
+cd ../streaming-service && npm install
 cd ../transcoding-service && npm install
 cd ../..
 ```
@@ -51,9 +52,10 @@ node start-platform.js
 ```
 
 The platform will start on:
+
 - **API Gateway: http://localhost:3000** (Main Entry Point)
 - Upload Service: http://localhost:3001
-- Streaming Service: http://localhost:3004  
+- Streaming Service: http://localhost:3004
 - Transcoding Service: http://localhost:3005
 
 ## Usage
@@ -61,18 +63,21 @@ The platform will start on:
 ### Upload a Video
 
 **Via API Gateway (Recommended):**
+
 ```bash
 curl -X POST -F "video=@your-video.mp4;type=video/mp4" -F "title=My Video" \
      http://localhost:3000/api/upload/file
 ```
 
 **Direct to Upload Service:**
+
 ```bash
 curl -X POST -F "video=@your-video.mp4;type=video/mp4" -F "title=My Video" \
      http://localhost:3001/api/v1/upload/file
 ```
 
 Response:
+
 ```json
 {
   "success": true,
@@ -90,16 +95,19 @@ Response:
 ### Check Status
 
 **Via API Gateway (Recommended):**
+
 ```bash
 curl http://localhost:3000/api/upload/status/job_1758010126855_6lecfzv3a
 ```
 
 **Direct to Upload Service:**
+
 ```bash
 curl http://localhost:3001/api/v1/upload/status/job_1758010126855_6lecfzv3a
 ```
 
 Response:
+
 ```json
 {
   "success": true,
@@ -119,6 +127,7 @@ Response:
 Once transcoding is complete, stream using:
 
 **Via API Gateway (Recommended):**
+
 ```
 http://localhost:3000/api/stream/job_1758010126855_6lecfzv3a/master.m3u8
 http://localhost:3000/api/stream/job_1758010126855_6lecfzv3a/360p/playlist.m3u8
@@ -127,6 +136,7 @@ http://localhost:3000/api/stream/job_1758010126855_6lecfzv3a/1080p/playlist.m3u8
 ```
 
 **Direct to Streaming Service:**
+
 ```
 http://localhost:3004/api/v1/stream/job_1758010126855_6lecfzv3a/master.m3u8
 http://localhost:3004/api/v1/stream/job_1758010126855_6lecfzv3a/360p/playlist.m3u8
@@ -255,6 +265,7 @@ video-streaming-platform/
 ### Test Platform
 
 Run comprehensive tests:
+
 ```bash
 ./test-platform.sh
 ```
@@ -323,6 +334,7 @@ docker exec kafka kafka-console-consumer --bootstrap-server localhost:9092 \
 ### Infrastructure Issues
 
 **Kafka Connection Failed:**
+
 ```bash
 # Check if Kafka is running
 docker ps | grep kafka
@@ -335,6 +347,7 @@ docker logs kafka
 ```
 
 **Redis Connection Failed:**
+
 ```bash
 # Check if Redis is running
 docker ps | grep redis
@@ -346,11 +359,12 @@ docker exec redis-server redis-cli ping
 ### Service Issues
 
 **FFmpeg Not Found:**
+
 ```bash
 # macOS
 brew install ffmpeg
 
-# Ubuntu/Debian  
+# Ubuntu/Debian
 sudo apt install ffmpeg
 
 # Windows
@@ -358,6 +372,7 @@ sudo apt install ffmpeg
 ```
 
 **Port Already in Use:**
+
 ```bash
 # Kill existing processes
 pkill -f "npm run dev"
@@ -368,6 +383,7 @@ lsof -i :3000,3001,3004,3005,9092,6379
 ```
 
 **Worker Not Processing Jobs:**
+
 ```bash
 # Check if worker is connected to Kafka
 docker logs kafka | grep transcoding-workers
@@ -382,6 +398,7 @@ docker exec kafka kafka-consumer-groups --bootstrap-server localhost:9092 --list
 ### Performance Issues
 
 **Slow Transcoding:**
+
 ```bash
 # Run multiple workers
 npm run worker &
@@ -392,6 +409,7 @@ htop
 ```
 
 **High Memory Usage:**
+
 ```bash
 # Restart services
 docker-compose restart
