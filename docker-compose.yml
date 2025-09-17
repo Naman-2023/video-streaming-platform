@@ -1,26 +1,9 @@
-version: '3.8'
+# Docker Compose for Video Streaming Pl
+
+# Services will run locally via start-platform.js
+# This docker-compose only provides infrastructure
 
 services:
-  video-platform:
-    build: .
-    ports:
-      - "3001:3001"  # Upload Service
-      - "3004:3004"  # Streaming Service  
-      - "3005:3005"  # Transcoding Service
-    volumes:
-      - ./transcoded:/app/transcoded
-      - ./test-videos:/app/test-videos
-    environment:
-      - NODE_ENV=production
-      - REDIS_URL=redis://localhost:6379
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
-    restart: unless-stopped
-
   # Redis for status cache and rate limiting
   redis:
     image: redis:7-alpine
@@ -50,7 +33,7 @@ services:
 
   # Kafka for event streaming and job queue
   kafka:
-    image: confluentinc/cp-kafka:latest
+    image: confluentinc/cp-kafka:7.4.0
     container_name: video-platform-kafka
     depends_on:
       - zookeeper
@@ -60,12 +43,12 @@ services:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: true
-      KAFKA_LOG_RETENTION_HOURS: 24
-      KAFKA_LOG_SEGMENT_BYTES: 1073741824
-    volumes:
-      - kafka-data:/var/lib/kafka/data
+      KAFKA_NUM_PARTITIONS: 1
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 1
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list"]

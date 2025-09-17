@@ -159,16 +159,16 @@ sudo crontab -e
 
 ## Environment Variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `NODE_ENV` | development | Environment mode |
-| `REDIS_URL` | redis://localhost:6379 | Redis connection URL |
-| `UPLOAD_MAX_SIZE` | 50MB | Maximum upload file size |
-| `TRANSCODING_TIMEOUT` | 300 | Transcoding timeout in seconds |
-| `LOG_LEVEL` | info | Logging level |
-| `PORT_UPLOAD` | 3001 | Upload service port |
-| `PORT_STREAMING` | 3004 | Streaming service port |
-| `PORT_TRANSCODING` | 3005 | Transcoding service port |
+| Variable              | Default                | Description                    |
+| --------------------- | ---------------------- | ------------------------------ |
+| `NODE_ENV`            | development            | Environment mode               |
+| `REDIS_URL`           | redis://localhost:6379 | Redis connection URL           |
+| `UPLOAD_MAX_SIZE`     | 50MB                   | Maximum upload file size       |
+| `TRANSCODING_TIMEOUT` | 300                    | Transcoding timeout in seconds |
+| `LOG_LEVEL`           | info                   | Logging level                  |
+| `PORT_UPLOAD`         | 3001                   | Upload service port            |
+| `PORT_STREAMING`      | 3004                   | Streaming service port         |
+| `PORT_TRANSCODING`    | 3005                   | Transcoding service port       |
 
 ## Monitoring and Maintenance
 
@@ -229,10 +229,10 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '2.0'
+          cpus: "2.0"
           memory: 4G
         reservations:
-          cpus: '1.0'
+          cpus: "1.0"
           memory: 2G
 ```
 
@@ -277,7 +277,7 @@ server {
     location /api/v1/upload/ {
         proxy_pass http://upload_backend;
     }
-    
+
     location /api/v1/stream/ {
         proxy_pass http://streaming_backend;
     }
@@ -289,6 +289,7 @@ server {
 ### Common Issues
 
 **1. Out of disk space**
+
 ```bash
 # Clean old transcoded files
 find transcoded/ -type f -mtime +7 -delete
@@ -298,6 +299,7 @@ docker system prune -a
 ```
 
 **2. High memory usage**
+
 ```bash
 # Restart services
 docker-compose restart
@@ -307,6 +309,7 @@ docker stats
 ```
 
 **3. Transcoding failures**
+
 ```bash
 # Check FFmpeg installation
 docker exec video-platform ffmpeg -version
@@ -316,6 +319,7 @@ docker exec video-platform redis-cli ping
 ```
 
 **4. Port conflicts**
+
 ```bash
 # Check what's using ports
 sudo netstat -tulpn | grep :3001
@@ -327,11 +331,13 @@ sudo fuser -k 3001/tcp
 ### Performance Issues
 
 **1. Slow transcoding**
+
 - Increase CPU allocation
 - Use SSD storage
 - Optimize FFmpeg settings
 
 **2. High latency streaming**
+
 - Use CDN for video delivery
 - Optimize HLS segment size
 - Enable gzip compression
@@ -355,12 +361,12 @@ echo "server_tokens off;" >> /etc/nginx/nginx.conf
 
 ```javascript
 // Add to upload service
-const allowedTypes = ['video/mp4', 'video/avi', 'video/mov'];
+const allowedTypes = ["video/mp4", "video/avi", "video/mov"];
 const maxFileSize = 100 * 1024 * 1024; // 100MB
 
 // Validate file type and size
 if (!allowedTypes.includes(file.mimetype)) {
-    throw new Error('Invalid file type');
+  throw new Error("Invalid file type");
 }
 ```
 
@@ -377,7 +383,7 @@ server {
     location /api/v1/upload/ {
         limit_req zone=upload burst=5;
     }
-    
+
     location /api/v1/stream/ {
         limit_req zone=stream burst=20;
     }
@@ -387,6 +393,7 @@ server {
 ## Support
 
 For issues and questions:
+
 1. Check the logs: `docker-compose logs -f`
 2. Run health checks: `./test-platform.sh`
 3. Review this deployment guide
