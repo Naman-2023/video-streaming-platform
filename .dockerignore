@@ -1,0 +1,30 @@
+# Video files
+*.mp4
+*.avi
+*.mov
+*.mkv
+
+# Node modules
+node_modules/
+*/node_modules/
+
+# Git
+.git/
+
+# Transcoded files
+transcoded/
+
+# Uploads
+services/upload-service/uploads/
+
+# IDE files
+.vscode/
+.kiro/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
